@@ -1,5 +1,5 @@
-const request = require('request');
 const terser = require('terser');
+const request = require('request');
 const fs = require('fs');
 
 function fixKey(key) {
@@ -52,7 +52,7 @@ request.get('https://krunker.io/pkg/loader.wasm', (err, res, body) => {
 
         console.log('[KRUNKER] - Got Version (%s)', version);
 
-        request.get('https://krunker.io/pkg/krunker.' + version + '.vries', {
+        request.get(`https://krunker.io/pkg/krunker.${version}.vries`, {
             encoding: null
         }, async (err, res, body) => {
             console.log('[KRUNKER] - Decoding Bytes...');
@@ -80,14 +80,19 @@ request.get('https://krunker.io/pkg/loader.wasm', (err, res, body) => {
                 rename: {}
             });
 
-            fs.writeFile('game.js', str, (err) => {
+            let gameVersion = code.match(/(?<=gameVersion\s=\s")[^"]+/)[0];
+
+            if (!fs.existsSync('output')) fs.mkdirSync('output');
+            if (!fs.existsSync(`output/${gameVersion}`)) fs.mkdirSync(`output/${gameVersion}`);
+
+            fs.writeFile(`output/${gameVersion}/game.${version}.js`, str, (err) => {
                 if (err) throw err;
-                console.log('[KRUNKER] - Saved original to game.js');
+                console.log('[KRUNKER] - Saved original to output/%s/game.%s.js', gameVersion, version);
             });
 
-            fs.writeFile('game_beautify.js', code, (err) => {
+            fs.writeFile(`output/${gameVersion}/game_beautify.${version}.js`, code, (err) => {
                 if (err) throw err;
-                console.log('[KRUNKER] - Saved beautified to game_beautify.js');
+                console.log('[KRUNKER] - Saved beautified to output/%s/game_beautify.%s.js', gameVersion, version);
             });
         });
     });
