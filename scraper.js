@@ -19,7 +19,7 @@ function fixKey(key) {
 }
 
 function fromVries(bytes) {
-    let buf = new Uint8Array(bytes.length);
+    let buf = Buffer.alloc(bytes.length);
 
     for (let i = 0; i < bytes.length; i++) {
         let byte = bytes[i];
@@ -34,10 +34,10 @@ function fromVries(bytes) {
 
         xorKey += subKey << 4;
 
-        buf[i] = byte ^ xorKey;
+        buf.writeUInt8(byte ^ xorKey, i);
     }
 
-    return new TextDecoder().decode(buf);
+    return buf.toString();
 }
 
 console.log('[KRUNKER] - Fetching Version...');
