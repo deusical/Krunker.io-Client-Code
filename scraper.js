@@ -1,8 +1,6 @@
-const terser = require('terser');
 const request = require('request');
+const terser = require('terser');
 const fs = require('fs');
-
-const keys = Buffer.from('e1f5bb730d17448e297a7e1ecf1481946fc33c4409e805203d9ddf034139eb8db57178b4cc5663d8f7c829d31b7ef761e517');
 
 function fixKey(key) {
     let subKey = key - 48;
@@ -18,7 +16,7 @@ function fixKey(key) {
     return subKey;
 }
 
-function fromVries(bytes) {
+function fromVries(bytes, keys) {
     let buf = Buffer.alloc(bytes.length);
 
     for (let i = 0; i < bytes.length; i++) {
@@ -40,49 +38,57 @@ function fromVries(bytes) {
     return buf.toString();
 }
 
-console.log('[KRUNKER] - Fetching Version...');
+console.log('[KRUNKER] - Fetching XOR Keys...');
 
-request.get('https://krunker.io/social.html', (err, res, body) => {
-    let version = body.match(/(?<=\w+.exports=")[^"]+/)[0];
+request.get('https://krunker.io/pkg/loader.wasm', (err, res, body) => {
+    let keyString = body.match(/[a-f0-9]{100}/)[0];
+    let keys = Buffer.from(keyString);
 
-    console.log('[KRUNKER] - Got Version (%s)', version);
+    console.log('[KRUNKER] - Got XOR Keys (%s)', keyString);
+    console.log('[KRUNKER] - Fetching Version...');
 
-    request.get('https://krunker.io/pkg/krunker.' + version + '.vries', {
-        encoding: null
-    }, async (err, res, body) => {
-        console.log('[KRUNKER] - Decoding Bytes...');
+    request.get('https://krunker.io/social.html', (err, res, body) => {
+        let version = body.match(/(?<=\w+.exports=")[^"]+/)[0];
 
-        let str = fromVries(body);
+        console.log('[KRUNKER] - Got Version (%s)', version);
 
-        console.log('[KRUNKER] - Formatting Code...');
+        request.get('https://krunker.io/pkg/krunker.' + version + '.vries', {
+            encoding: null
+        }, async (err, res, body) => {
+            console.log('[KRUNKER] - Decoding Bytes...');
 
-        let { code } = await terser.minify(str, {
-            compress: {
-                join_vars: false,
-                hoist_vars: true,
-                reduce_vars: false,
-                collapse_vars: false,
-                sequences: false
-            },
-            mangle: {
-                keep_classnames: true,
-                keep_fnames: true
-            },
-            output: {
-                beautify: true
-            },
-            parse: {},
-            rename: {}
-        });
+            let str = fromVries(body, keys);
 
-        fs.writeFile('game.js', str, (err) => {
-            if (err) throw err;
-            console.log('[KRUNKER] - Saved original to game.js');
-        });
+            console.log('[KRUNKER] - Formatting Code...');
 
-        fs.writeFile('game_beautify.js', code, (err) => {
-            if (err) throw err;
-            console.log('[KRUNKER] - Saved beautified to game_beautify.js');
+            let { code } = await terser.minify(str, {
+                compress: {
+                    join_vars: false,
+                    hoist_vars: true,
+                    reduce_vars: false,
+                    collapse_vars: false,
+                    sequences: false
+                },
+                mangle: {
+                    keep_classnames: true,
+                    keep_fnames: true
+                },
+                output: {
+                    beautify: true
+                },
+                parse: {},
+                rename: {}
+            });
+
+            fs.writeFile('game.js', str, (err) => {
+                if (err) throw err;
+                console.log('[KRUNKER] - Saved original to game.js');
+            });
+
+            fs.writeFile('game_beautify.js', code, (err) => {
+                if (err) throw err;
+                console.log('[KRUNKER] - Saved beautified to game_beautify.js');
+            });
         });
     });
 });
