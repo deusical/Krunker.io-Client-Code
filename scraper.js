@@ -1,33 +1,80 @@
-const beautify = require('js-beautify').js;
+const terser = require('terser');
 const request = require('request');
 const fs = require('fs');
+
+const keys = Buffer.from('e1f5bb730d17448e297a7e1ecf1481946fc33c4409e805203d9ddf034139eb8db57178b4cc5663d8f7c829d31b7ef761e517');
+
+function fixKey(key) {
+    let subKey = key - 48;
+
+    if ((subKey & 255) < 10) {
+        // empty
+    } else if ((key - 65 & 255) <= 5) {
+        subKey = key - 55;
+    } else if ((key - 97 & 255) < 6) {
+        subKey = key - 87;
+    }
+
+    return subKey;
+}
+
+function fromVries(bytes) {
+    let str = '';
+
+    for (let i = 0; i < bytes.length; i++) {
+        let byte = bytes[i];
+
+        let index = i * 2 % keys.length;
+
+        let key = keys[index];
+        let key2 = keys[index + 1];
+
+        let subKey = fixKey(key);
+        let xorKey = fixKey(key2);
+
+        xorKey += subKey << 4;
+
+        let char = String.fromCharCode(byte ^ xorKey);
+
+        str += char;
+    }
+
+    return str;
+}
 
 console.log('[KRUNKER] - Fetching Version...');
 
 request.get('https://krunker.io/social.html', (err, res, body) => {
-    var version = body.match(/(?<=\w+.exports=")[^"]+/)[0];
-
-    // Discord - Lemons#0001
+    let version = body.match(/(?<=\w+.exports=")[^"]+/)[0];
 
     console.log('[KRUNKER] - Got Version (%s)', version);
 
     request.get('https://krunker.io/pkg/krunker.' + version + '.vries', {
         encoding: null
-    }, (err, res, buf) => {
-        var str = '';
-        
+    }, async (err, res, body) => {
         console.log('[KRUNKER] - Decoding Bytes...');
-        
-        for (var i = 0; i < buf.byteLength; i++) {
-            var byte = buf.readUInt8(i) ^ 0x69;
-            str += String.fromCharCode(byte);
-        }
+
+        let str = fromVries(body);
 
         console.log('[KRUNKER] - Formatting Code...');
 
-        var code = beautify(str, {
-            indent_size: 4,
-            space_in_empty_paren: true
+        let { code } = await terser.minify(str, {
+            compress: {
+                join_vars: false,
+                hoist_vars: true,
+                reduce_vars: false,
+                collapse_vars: false,
+                sequences: false
+            },
+            mangle: {
+                keep_classnames: true,
+                keep_fnames: true
+            },
+            output: {
+                beautify: true
+            },
+            parse: {},
+            rename: {}
         });
 
         fs.writeFile('game.js', str, (err) => {
